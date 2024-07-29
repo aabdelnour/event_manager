@@ -1,14 +1,16 @@
-from builtins import str
+#tests/test_schemas/test_user_schemas.py
 import pytest
 from pydantic import ValidationError
 from datetime import datetime
-from app.schemas.user_schemas import UserBase, UserCreate, UserUpdate, UserResponse, UserListResponse, LoginRequest
+from app.schemas.user_schemas import UserBase, UserCreate, UserUpdate, UserResponse, LoginRequest
+import uuid
 
 # Tests for UserBase
 def test_user_base_valid(user_base_data):
     user = UserBase(**user_base_data)
     assert user.nickname == user_base_data["nickname"]
     assert user.email == user_base_data["email"]
+    assert user.first_name == user_base_data["first_name"]
 
 # Tests for UserCreate
 def test_user_create_valid(user_create_data):
@@ -25,8 +27,7 @@ def test_user_update_valid(user_update_data):
 # Tests for UserResponse
 def test_user_response_valid(user_response_data):
     user = UserResponse(**user_response_data)
-    assert user.id == user_response_data["id"]
-    # assert user.last_login_at == user_response_data["last_login_at"]
+    assert str(user.id) == user_response_data["id"]
 
 # Tests for LoginRequest
 def test_login_request_valid(login_request_data):
@@ -64,6 +65,16 @@ def test_user_base_url_invalid(url, user_base_data):
 def test_user_base_invalid_email(user_base_data_invalid):
     with pytest.raises(ValidationError) as exc_info:
         user = UserBase(**user_base_data_invalid)
-    
+
     assert "value is not a valid email address" in str(exc_info.value)
     assert "john.doe.example.com" in str(exc_info.value)
+
+# Additional test for unique email
+@pytest.mark.asyncio
+async def test_create_user_duplicate_email(async_client, user_base_data):
+    response1 = await async_client.post("/users/", json=user_base_data)
+    assert response1.status_code == 201
+
+    response2 = await async_client.post("/users/", json=user_base_data)
+    assert response2.status_code == 400
+    assert "User with given email already exists" in response2.json()["detail"]
